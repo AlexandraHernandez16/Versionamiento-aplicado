@@ -56,8 +56,22 @@ class ApiClient {
     final json = _tryDecode(response);
     final code = response.statusCode;
     if (code >= 200 && code <= 300) return json;
-    throw const NetworkFailure();
+    throw _toFailure(code, json);
   }
+
+  //Traduce una respuesta no exitosa al Failure que le corresponde
+  Failure _toFailure(int code, dynamic json) {
+    final detail = json is Map ? json['detail'] : null;
+    return switch (code) {
+      404 => NotFoundFailure(_detailText(detail) ?? 'Recurso no encontrado'),
+      409 => ConflictFailure(_detailText(detail) ?? 'Conflicto con el estado actual'),
+      >= 500 && <= 599 => ServerFailure(code),
+      _ => UnexpectedFailure(code, _detailText(detail) ?? 'Error inesperado ($code)'),
+    };
+  }
+
+  //detail es un texto en 404, 409 y errores simulados; si no lo es (lista o null) no hay mensaje
+  String? _detailText(dynamic detail) => detail is String ? detail : null;
 
   dynamic _tryDecode(http.Response response) {
     if (response.bodyBytes.isEmpty) return null;
